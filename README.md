@@ -115,8 +115,11 @@ bughunter v "finding"        # short alias for validate
 | **DeepSeek** | Very cheap ($0.001/1K tokens) | Cloud | Fast | [platform.deepseek.com](https://platform.deepseek.com) |
 | Claude API | Paid | Cloud | Fast | [console.anthropic.com](https://console.anthropic.com) |
 | OpenAI | Paid | Cloud | Fast | [platform.openai.com](https://platform.openai.com) |
+| **Gemini** | Free tier available | Cloud | Fast | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → get API key |
 
 BugHunter auto-detects providers in this order: **Ollama → Groq → DeepSeek → Claude → OpenAI**
+
+Gemini is a cloud provider configured through the `GEMINI_API_KEY` environment variable, alongside the other cloud providers (Groq, DeepSeek, Claude, OpenAI, Grok). Gemini operates with its default safety settings — BugHunter applies no safety-setting override.
 
 Switch providers anytime: `bughunter setup`
 

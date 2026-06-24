@@ -30,6 +30,8 @@ venv/
 # Logs
 *.log
 *.txt.bak
+.kiro/*
+tests/*
 
 # Tool output
 *.out

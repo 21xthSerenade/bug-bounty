@@ -11,6 +11,8 @@ Providers (auto-detected, first available wins):
                     get key: https://console.groq.com
          deepseek — very cheap cloud,       set DEEPSEEK_API_KEY
                     get key: https://platform.deepseek.com
+         gemini   — cloud free tier,         set GEMINI_API_KEY
+                    get key: https://aistudio.google.com/apikey
   PAID:  claude   — set ANTHROPIC_API_KEY
          openai   — set OPENAI_API_KEY
          grok     — set XAI_API_KEY
@@ -203,9 +205,10 @@ def cmd_setup(args):
         "1": ("ollama",   "Ollama  (local, FREE)       — needs ollama running locally"),
         "2": ("groq",     "Groq    (cloud, FREE tier)  — needs GROQ_API_KEY"),
         "3": ("deepseek", "DeepSeek (cloud, very cheap)— needs DEEPSEEK_API_KEY"),
-        "4": ("claude",   "Claude  (paid)              — needs ANTHROPIC_API_KEY"),
-        "5": ("openai",   "OpenAI  (paid)              — needs OPENAI_API_KEY"),
-        "6": ("grok",     "Grok/xAI (paid)             — needs XAI_API_KEY"),
+        "4": ("gemini",   "Gemini  (cloud, FREE tier)  — needs GEMINI_API_KEY"),
+        "5": ("claude",   "Claude  (paid)              — needs ANTHROPIC_API_KEY"),
+        "6": ("openai",   "OpenAI  (paid)              — needs OPENAI_API_KEY"),
+        "7": ("grok",     "Grok/xAI (paid)             — needs XAI_API_KEY"),
     }
 
     print("Choose your AI backend:\n")
@@ -222,6 +225,7 @@ def cmd_setup(args):
     env_map = {
         "groq":     "GROQ_API_KEY",
         "deepseek": "DEEPSEEK_API_KEY",
+        "gemini":   "GEMINI_API_KEY",
         "claude":   "ANTHROPIC_API_KEY",
         "openai":   "OPENAI_API_KEY",
         "grok":     "XAI_API_KEY",
@@ -275,14 +279,16 @@ def cmd_providers(args):
         "ollama":   None,
         "groq":     "GROQ_API_KEY",
         "deepseek": "DEEPSEEK_API_KEY",
+        "gemini":   "GEMINI_API_KEY",
         "claude":   "ANTHROPIC_API_KEY",
         "openai":   "OPENAI_API_KEY",
         "grok":     "XAI_API_KEY",
     }
     tier = {
         "ollama": "FREE (local)", "groq": "FREE tier",
-        "deepseek": "cheap",      "claude": "paid",
-        "openai": "paid",         "grok": "paid",
+        "deepseek": "cheap",      "gemini": "FREE tier",
+        "claude": "paid",         "openai": "paid",
+        "grok": "paid",
     }
 
     print(f"\n  {'PROVIDER':<12} {'TIER':<16} {'STATUS':<20} {'NOTE'}")
@@ -623,7 +629,7 @@ def main():
         """),
     )
     parser.add_argument("--provider", "-p",
-                        help="Force provider: ollama / groq / deepseek / claude / openai / grok")
+                        help="Force provider: ollama / groq / deepseek / gemini / claude / openai / grok")
     parser.add_argument("--no-banner", action="store_true", help="Suppress banner")
 
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
@@ -662,8 +668,8 @@ def main():
 
     # Load saved API keys into environment before any LLM call
     cfg = load_config()
-    for env_var in ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY",
-                    "OPENAI_API_KEY", "XAI_API_KEY"):
+    for env_var in ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY",
+                    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "XAI_API_KEY"):
         if not os.environ.get(env_var) and cfg.get(env_var):
             os.environ[env_var] = cfg[env_var]
 
