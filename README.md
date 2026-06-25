@@ -111,6 +111,7 @@ bughunter v "finding"        # short alias for validate
 | Provider | Cost | Privacy | Speed | Get Started |
 |:---|:---|:---|:---|:---|
 | **Ollama** | 100% free · runs locally | Full — stays on your machine | Fast | `ollama pull qwen2.5:14b` |
+| **NineRouter** (`ninerouter`) | FREE · runs locally · API key optional | Local by default — data flows only to your configured upstreams | Fast | `npm install -g 9router` → defaults to `http://localhost:20128/v1` |
 | **Groq** | Free tier available | Cloud | Very fast | [console.groq.com](https://console.groq.com) → get API key |
 | **DeepSeek** | Very cheap ($0.001/1K tokens) | Cloud | Fast | [platform.deepseek.com](https://platform.deepseek.com) |
 | Claude API | Paid | Cloud | Fast | [console.anthropic.com](https://console.anthropic.com) |
@@ -120,6 +121,8 @@ bughunter v "finding"        # short alias for validate
 BugHunter auto-detects providers in this order: **Ollama → Groq → DeepSeek → Claude → OpenAI**
 
 Gemini is a cloud provider configured through the `GEMINI_API_KEY` environment variable, alongside the other cloud providers (Groq, DeepSeek, Claude, OpenAI, Grok). Gemini operates with its default safety settings — BugHunter applies no safety-setting override.
+
+NineRouter is listed alongside every other supported provider under the identical key `ninerouter`. It runs locally by default at `http://localhost:20128/v1` and is installed separately with `npm install -g 9router`. Configure it through the `NINEROUTER_BASE_URL` and `NINEROUTER_MODEL` environment variables, with an optional `NINEROUTER_API_KEY` (NineRouter works keyless against a local gateway). Because NineRouter runs on your machine, hunting data flows only to the upstreams you configure on the operator side and nowhere else. BugHunter sends NineRouter requests with no safety-setting overrides, so whatever upstream safety policy applies stays in effect unchanged.
 
 Switch providers anytime: `bughunter setup`
 

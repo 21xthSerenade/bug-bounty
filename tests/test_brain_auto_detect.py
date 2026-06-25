@@ -64,7 +64,12 @@ def test_openai_and_grok_keys_both_front_nothing_available(brain_module, monkeyp
     assert chosen == "ollama"
     assert set(tracker.calls[:2]) == {"openai", "grok"}, \
         "key-bearing providers must be probed before the rest"
-    assert tracker.calls[2:] == ["ollama", "claude"], \
+    # The providers without a key set keep their original PROVIDER_PRIORITY
+    # relative order. Compute that expectation dynamically so the test stays
+    # correct as the priority list grows.
+    expected_rest = [p for p in brain_module.LLMClient.PROVIDER_PRIORITY
+                     if p not in ("openai", "grok")]
+    assert tracker.calls[2:] == expected_rest, \
         "providers without keys keep their original relative order"
 
 

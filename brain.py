@@ -76,6 +76,44 @@ except ImportError:
 # ── Config ─────────────────────────────────────────────────────────────────────
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
+# ── NineRouter (9Router) config ─────────────────────────────────────────────────
+# 9Router is a local, OpenAI-compatible aggregating gateway. The base URL is
+# operator-configurable; the localhost default below is the ONLY hardcoded host
+# literal in the NineRouter path. The default model is configurable too, with a
+# documented, non-paid fallback slug.
+NINEROUTER_DEFAULT_BASE_URL = "http://localhost:20128/v1"  # only hardcoded host (R2.3)
+NINEROUTER_FALLBACK_MODEL = "auto"  # documented, non-paid 9Router routing slug (R3.2, R3.3)
+NINEROUTER_MODEL_MAXLEN = 256
+
+
+def resolve_ninerouter_base_url(env_value: str | None) -> str:
+    """Resolve the NineRouter base URL from ``NINEROUTER_BASE_URL``.
+
+    Returns the trimmed env value when it contains at least one non-whitespace
+    character, otherwise the localhost default. The result is only ever the
+    trimmed env value or ``NINEROUTER_DEFAULT_BASE_URL`` — no other host literal.
+    """
+    trimmed = (env_value or "").strip()
+    return trimmed or NINEROUTER_DEFAULT_BASE_URL
+
+
+def resolve_ninerouter_model(caller_model: str | None, env_value: str | None) -> str:
+    """Resolve the NineRouter model with caller > env > fallback precedence.
+
+    A caller-supplied model with at least one non-whitespace character wins
+    verbatim (the env value is not read). Otherwise the trimmed
+    ``NINEROUTER_MODEL`` (``env_value``) truncated to ``NINEROUTER_MODEL_MAXLEN``
+    is used. If neither is present, the documented non-paid
+    ``NINEROUTER_FALLBACK_MODEL`` is returned.
+    """
+    if caller_model is not None and caller_model.strip():
+        return caller_model  # caller wins verbatim; env not read (R3.4)
+    env = (env_value or "").strip()
+    if env:
+        return env[:NINEROUTER_MODEL_MAXLEN]  # trimmed + truncated to 256 (R3.1)
+    return NINEROUTER_FALLBACK_MODEL  # stable, non-paid fallback (R3.2)
+
+
 # ── Multi-provider LLM client ──────────────────────────────────────────────────
 # Wraps Ollama, Claude, OpenAI, Grok behind a single .chat() interface.
 
@@ -99,7 +137,7 @@ class LLMClient:
     PROVIDER_PRIORITY = [
         "ollama", "groq", "deepseek", "cerebras",
         "gemini", "kimi", "mistral", "together",
-        "perplexity", "claude", "openai", "grok",
+        "perplexity", "ninerouter", "claude", "openai", "grok",
     ]
 
     # Default models per provider
@@ -115,6 +153,7 @@ class LLMClient:
         "together":    "meta-llama/Llama-3.3-70B-Instruct-Turbo",
         "cerebras":    "llama3.3-70b",
         "perplexity":  "sonar-pro",
+        "ninerouter":  NINEROUTER_FALLBACK_MODEL,  # static fallback; init overlays resolved value
         "ollama":      None,  # resolved dynamically
     }
 
@@ -143,6 +182,7 @@ class LLMClient:
         "together":    "TOGETHER_API_KEY",
         "cerebras":    "CEREBRAS_API_KEY",
         "perplexity":  "PERPLEXITY_API_KEY",
+        "ninerouter":  "NINEROUTER_API_KEY",
     }
 
     def _auto_detect(self) -> str:
@@ -313,6 +353,28 @@ class LLMClient:
             self.available   = True
             self.description = "Perplexity AI (sonar-pro — live web search)"
 
+        elif provider == "ninerouter":
+            # 9Router is a local OpenAI-compatible gateway. Unlike the other
+            # providers, the base URL is operator-configurable (defaulting to the
+            # localhost literal), the API key is optional, and the provider is
+            # available even without a key — keyless local connection is valid.
+            import requests
+            base = resolve_ninerouter_base_url(os.environ.get("NINEROUTER_BASE_URL"))  # R2.1, R2.2
+            key  = os.environ.get("NINEROUTER_API_KEY", "").strip()                    # R4 optional key
+            self._http = requests.Session()
+            headers = {"Content-Type": "application/json"}
+            if key:                                                                    # only when non-ws (R4.1)
+                headers["Authorization"] = f"Bearer {key}"
+            self._http.headers.update(headers)
+            self._api_base   = base                                                    # resolved, not hardcoded (R2.5)
+            self.DEFAULT_MODELS = {                                                     # effective default (R1.4)
+                **type(self).DEFAULT_MODELS,
+                "ninerouter": resolve_ninerouter_model(None, os.environ.get("NINEROUTER_MODEL")),
+            }
+            self.available   = True                                                    # available even keyless (R4.2, R4.3)
+            self.description = f"9Router (local gateway @ {base})"
+            # NOTE: deliberately no `if not key: return` — keyless local connection is valid.
+
     def chat(self, model: str | None, system: str, user: str,
              max_tokens: int = 4000, temperature: float = 0.1) -> str:
         """Send a chat request; return the assistant reply as a string."""
@@ -326,6 +388,7 @@ class LLMClient:
             elif self.provider in (
                 "openai", "grok", "groq", "deepseek",
                 "gemini", "kimi", "mistral", "together", "cerebras", "perplexity",
+                "ninerouter",
             ):
                 return self._chat_openai_compat(model, system, user, max_tokens, temperature)
         except Exception as e:
@@ -368,7 +431,10 @@ class LLMClient:
     def _chat_openai_compat(self, model, system, user, max_tokens, temperature) -> str:
         import json as _json
         base = self._api_base
-        m    = model or self.DEFAULT_MODELS[self.provider]
+        if self.provider == "ninerouter":
+            m = resolve_ninerouter_model(model, os.environ.get("NINEROUTER_MODEL"))
+        else:
+            m = model or self.DEFAULT_MODELS[self.provider]
         body = {"model": m, "max_tokens": max_tokens, "temperature": temperature,
                 "messages": [{"role": "system", "content": system},
                              {"role": "user",   "content": user}]}
@@ -411,6 +477,9 @@ class LLMClient:
             return ["llama3.3-70b", "llama3.1-8b"]
         elif self.provider == "perplexity":
             return ["sonar-pro", "sonar", "sonar-reasoning-pro", "sonar-reasoning"]
+        elif self.provider == "ninerouter":
+            # 9Router routes provider/model slugs; advertise resolved default + non-paid fallback
+            return list(dict.fromkeys([self.DEFAULT_MODELS["ninerouter"], NINEROUTER_FALLBACK_MODEL]))
         return []
 
 # Model preference order — first available wins

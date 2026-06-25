@@ -7,6 +7,8 @@ Providers (auto-detected, first available wins):
   FREE:  ollama   — local model, zero cost
                     install: curl -fsSL https://ollama.ai/install.sh | sh
                     then:    ollama pull qwen2.5:14b
+         ninerouter — local gateway (FREE), optional NINEROUTER_API_KEY
+                    install: npm install -g 9router
          groq     — cloud free tier (fast), set GROQ_API_KEY
                     get key: https://console.groq.com
          deepseek — very cheap cloud,       set DEEPSEEK_API_KEY
@@ -202,13 +204,14 @@ def cmd_setup(args):
     header("BugHunter Setup")
 
     providers = {
-        "1": ("ollama",   "Ollama  (local, FREE)       — needs ollama running locally"),
-        "2": ("groq",     "Groq    (cloud, FREE tier)  — needs GROQ_API_KEY"),
-        "3": ("deepseek", "DeepSeek (cloud, very cheap)— needs DEEPSEEK_API_KEY"),
-        "4": ("gemini",   "Gemini  (cloud, FREE tier)  — needs GEMINI_API_KEY"),
-        "5": ("claude",   "Claude  (paid)              — needs ANTHROPIC_API_KEY"),
-        "6": ("openai",   "OpenAI  (paid)              — needs OPENAI_API_KEY"),
-        "7": ("grok",     "Grok/xAI (paid)             — needs XAI_API_KEY"),
+        "1": ("ollama",     "Ollama   (local, FREE)       — needs ollama running locally"),
+        "2": ("ninerouter", "9Router  (local, FREE)       — needs 9router running; NINEROUTER_API_KEY optional"),
+        "3": ("groq",       "Groq     (cloud, FREE tier)  — needs GROQ_API_KEY"),
+        "4": ("deepseek",   "DeepSeek (cloud, very cheap) — needs DEEPSEEK_API_KEY"),
+        "5": ("gemini",     "Gemini   (cloud, FREE tier)  — needs GEMINI_API_KEY"),
+        "6": ("claude",     "Claude   (paid)              — needs ANTHROPIC_API_KEY"),
+        "7": ("openai",     "OpenAI   (paid)              — needs OPENAI_API_KEY"),
+        "8": ("grok",       "Grok/xAI (paid)              — needs XAI_API_KEY"),
     }
 
     print("Choose your AI backend:\n")
@@ -223,6 +226,7 @@ def cmd_setup(args):
     cfg["provider"] = provider
 
     env_map = {
+        "ninerouter": "NINEROUTER_API_KEY",
         "groq":     "GROQ_API_KEY",
         "deepseek": "DEEPSEEK_API_KEY",
         "gemini":   "GEMINI_API_KEY",
@@ -234,13 +238,20 @@ def cmd_setup(args):
     if provider in env_map:
         env_var = env_map[provider]
         existing = os.environ.get(env_var, "")
-        print(f"\nEnter {env_var} (blank = keep existing): ", end="")
-        api_key = input().strip()
+        while True:
+            print(f"\nEnter {env_var} (blank = keep existing): ", end="")
+            api_key = input().strip()
+            if len(api_key) > 512:
+                warn(f"Key exceeds the 512-character limit — re-enter {env_var}")
+                continue
+            break
         if api_key:
             cfg[env_var] = api_key
             os.environ[env_var] = api_key
         elif existing:
             info(f"Using existing {env_var} from environment")
+        elif provider == "ninerouter":
+            info("No NINEROUTER_API_KEY — connecting to local 9Router without a key")
         else:
             warn(f"No {env_var} set — provider may not work")
 
@@ -276,16 +287,18 @@ def cmd_providers(args):
     saved = cfg.get("provider", "")
 
     env_map = {
-        "ollama":   None,
-        "groq":     "GROQ_API_KEY",
-        "deepseek": "DEEPSEEK_API_KEY",
-        "gemini":   "GEMINI_API_KEY",
-        "claude":   "ANTHROPIC_API_KEY",
-        "openai":   "OPENAI_API_KEY",
-        "grok":     "XAI_API_KEY",
+        "ollama":     None,
+        "ninerouter": "NINEROUTER_API_KEY",
+        "groq":       "GROQ_API_KEY",
+        "deepseek":   "DEEPSEEK_API_KEY",
+        "gemini":     "GEMINI_API_KEY",
+        "claude":     "ANTHROPIC_API_KEY",
+        "openai":     "OPENAI_API_KEY",
+        "grok":       "XAI_API_KEY",
     }
     tier = {
-        "ollama": "FREE (local)", "groq": "FREE tier",
+        "ollama": "FREE (local)", "ninerouter": "FREE (local)",
+        "groq": "FREE tier",
         "deepseek": "cheap",      "gemini": "FREE tier",
         "claude": "paid",         "openai": "paid",
         "grok": "paid",
@@ -629,7 +642,7 @@ def main():
         """),
     )
     parser.add_argument("--provider", "-p",
-                        help="Force provider: ollama / groq / deepseek / gemini / claude / openai / grok")
+                        help="Force provider: ollama / ninerouter / groq / deepseek / gemini / claude / openai / grok")
     parser.add_argument("--no-banner", action="store_true", help="Suppress banner")
 
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
@@ -668,7 +681,7 @@ def main():
 
     # Load saved API keys into environment before any LLM call
     cfg = load_config()
-    for env_var in ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY",
+    for env_var in ("NINEROUTER_API_KEY", "GROQ_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY",
                     "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "XAI_API_KEY"):
         if not os.environ.get(env_var) and cfg.get(env_var):
             os.environ[env_var] = cfg[env_var]
